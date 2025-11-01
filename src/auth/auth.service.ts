@@ -6,18 +6,23 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../common/services/email.service';
+import { DiscordService } from '../common/services/discord.service';
 import * as bcrypt from 'bcrypt';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordConfirmDto } from './dto/reset-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { SetupAccountDto } from './dto/setup-account.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private emailService: EmailService,
+    private discordService: DiscordService,
   ) {}
 
   private generateOtp(): string {
@@ -36,15 +41,21 @@ export class AuthService {
     return bcrypt.compare(password, hash);
   }
 
-  // Send OTP via email (stub - implement with SendGrid/Nodemailer)
+  // Send OTP via email using Resend
   private async sendOtpEmail(
     email: string,
     code: string,
-    type: 'verification' | 'reset',
+    type: 'verification' | 'reset' | 'email-update',
   ): Promise<void> {
-    console.log(`📧 Sending ${type} OTP to ${email}: ${code}`);
-    // TODO: Implement actual email sending
-    // await this.emailService.sendOtp(email, code, type);
+    await this.emailService.sendOtpEmail(email, {
+      code,
+      type:
+        type === 'email-update'
+          ? 'email-update'
+          : type === 'reset'
+            ? 'reset'
+            : 'verification',
+    });
   }
 
   // 1. SIGNUP - Create user and send OTP
@@ -120,6 +131,21 @@ export class AuthService {
       data: { isUsed: true },
     });
 
+    // Send Discord notification if user is being verified for the first time
+    if (!user.isVerified) {
+      // User will be verified in setupAccount, so we'll notify there
+      // But we can send a notification here too
+      this.discordService
+        .notifyUserSignup({
+          email: user.email,
+          fullName: user.fullName,
+          userId: user.id,
+        })
+        .catch(() => {
+          // Fail silently - don't block the flow
+        });
+    }
+
     return {
       message: 'OTP verified successfully',
       userId: user.id,
@@ -179,6 +205,17 @@ export class AuthService {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       },
     });
+
+    // Send Discord notification for new user signup
+    this.discordService
+      .notifyUserSignup({
+        email: updatedUser.email,
+        fullName: updatedUser.fullName,
+        userId: updatedUser.id,
+      })
+      .catch(() => {
+        // Fail silently - don't block the flow
+      });
 
     return {
       message: 'Account setup successful',

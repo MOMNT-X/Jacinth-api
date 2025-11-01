@@ -6,13 +6,18 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../common/services/email.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateEmailDto } from './dto/update-email.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private emailService: EmailService,
+  ) {}
 
   // Get user profile by ID
   async getUserById(userId: string) {
@@ -223,8 +228,11 @@ export class UserService {
       },
     });
 
-    // TODO: Send OTP to new email
-    console.log(`📧 Email update OTP for ${dto.newEmail}: ${otpCode}`);
+    // Send OTP to new email
+    await this.emailService.sendOtpEmail(dto.newEmail, {
+      code: otpCode,
+      type: 'email-update',
+    });
 
     return {
       message: 'Verification code sent to new email',
