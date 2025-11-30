@@ -9,6 +9,7 @@ import {
   Headers,
   Param,
   Get,
+  Query,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { InitializePaymentDto } from './dto/initialize-payment.dto';
@@ -47,9 +48,14 @@ export class PaymentsController {
 
   @Get('transactions')
   @UseGuards(JwtAuthGuard)
-  getUserTransactions(@Request() req) {
-    // This can be implemented to get user's transaction history
-    return { message: 'Feature coming soon' };
+  getUserTransactions(
+    @Request() req,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 10;
+    return this.paymentsService.getUserTransactions(req.user.id, pageNum, limitNum);
   }
 }
 

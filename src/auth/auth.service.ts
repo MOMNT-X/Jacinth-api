@@ -3,11 +3,13 @@ import {
   BadRequestException,
   UnauthorizedException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../common/services/email.service';
 import { DiscordService } from '../common/services/discord.service';
+import { TwilioService } from '../common/services/twilio.service';
 import * as bcrypt from 'bcrypt';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
@@ -15,14 +17,18 @@ import { ResetPasswordConfirmDto } from './dto/reset-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { SetupAccountDto } from './dto/setup-account.dto';
+import { SendPhoneOtpDto, VerifyPhoneOtpDto } from './dto/verify-phone-otp.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private emailService: EmailService,
     private discordService: DiscordService,
+    private twilioService: TwilioService,
   ) {}
 
   private generateOtp(): string {
@@ -41,7 +47,7 @@ export class AuthService {
     return bcrypt.compare(password, hash);
   }
 
-  // Send OTP via email using Resend
+  // Send OTP via email using SendGrid
   private async sendOtpEmail(
     email: string,
     code: string,
@@ -56,6 +62,14 @@ export class AuthService {
             ? 'reset'
             : 'verification',
     });
+  }
+
+  // Send OTP via SMS using Twilio
+  private async sendOtpSms(
+    phoneNumber: string,
+    code: string,
+  ): Promise<{ success: boolean; messageSid?: string; error?: string }> {
+    return this.twilioService.sendOtpSms(phoneNumber, code);
   }
 
   // 1. SIGNUP - Create user and send OTP
@@ -348,5 +362,80 @@ export class AuthService {
     });
 
     return { message: 'Password reset successful' };
+  }
+
+  // 7. SEND PHONE OTP - Send OTP via SMS
+  async sendPhoneOtp(dto: SendPhoneOtpDto) {
+    // Check if user exists with this phone number
+    const user = await this.prisma.user.findUnique({
+      where: { phoneNumber: dto.phoneNumber },
+    });
+
+    if (!user) {
+      throw new BadRequestException('User with this phone number not found');
+    }
+
+    // Generate OTP
+    const otpCode = this.generateOtp();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await this.prisma.otp.create({
+      data: {
+        userId: user.id,
+        code: otpCode,
+        type: 'PHONE_VERIFICATION',
+        expiresAt,
+      },
+    });
+
+    // Send OTP via SMS
+    const smsResult = await this.sendOtpSms(dto.phoneNumber, otpCode);
+    
+    if (!smsResult.success) {
+      this.logger.error(`Failed to send SMS OTP: ${smsResult.error}`);
+      throw new BadRequestException('Failed to send OTP. Please try again.');
+    }
+
+    return {
+      message: 'OTP sent to your phone number',
+      phoneNumber: dto.phoneNumber,
+    };
+  }
+
+  // 8. VERIFY PHONE OTP
+  async verifyPhoneOtp(dto: VerifyPhoneOtpDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { phoneNumber: dto.phoneNumber },
+    });
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    const otp = await this.prisma.otp.findFirst({
+      where: {
+        userId: user.id,
+        code: dto.code,
+        type: 'PHONE_VERIFICATION',
+        isUsed: false,
+        expiresAt: { gte: new Date() },
+      },
+    });
+
+    if (!otp) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    // Mark OTP as used
+    await this.prisma.otp.update({
+      where: { id: otp.id },
+      data: { isUsed: true },
+    });
+
+    return {
+      message: 'Phone number verified successfully',
+      userId: user.id,
+      phoneNumber: user.phoneNumber,
+    };
   }
 }

@@ -31,6 +31,39 @@
 $ npm install
 ```
 
+## Environment Variables
+
+Copy `env.example` to `.env` and fill in all required environment variables:
+
+```bash
+$ cp env.example .env
+```
+
+Required environment variables:
+- `DATABASE_URL` - PostgreSQL connection string
+- `DIRECT_URL` - PostgreSQL direct connection string
+- `JWT_SECRET` - Secret key for JWT tokens
+- `SENDGRID_API_KEY` - SendGrid API key for email service
+- `TWILIO_ACCOUNT_SID` - Twilio Account SID for SMS service
+- `TWILIO_AUTH_TOKEN` - Twilio Auth Token
+- `TWILIO_PHONE_NUMBER` - Twilio phone number
+- `PAYSTACK_SECRET_KEY` / `PAYSTACK_PUBLIC_KEY` - Paystack credentials
+- `FLUTTERWAVE_SECRET_KEY` / `FLUTTERWAVE_PUBLIC_KEY` - Flutterwave credentials
+- `DISCORD_WEBHOOK_URL` - Discord webhook URL for notifications
+
+## Database Setup
+
+```bash
+# Generate Prisma Client
+$ npx prisma generate
+
+# Run migrations
+$ npx prisma migrate dev
+
+# Or in production
+$ npx prisma migrate deploy
+```
+
 ## Compile and run the project
 
 ```bash
@@ -56,6 +89,107 @@ $ npm run test:e2e
 # test coverage
 $ npm run test:cov
 ```
+
+## Docker Setup
+
+### Development with Docker Compose
+
+```bash
+# Start all services (PostgreSQL + Backend)
+$ docker-compose up -d
+
+# View logs
+$ docker-compose logs -f backend
+
+# Stop services
+$ docker-compose down
+
+# Stop and remove volumes
+$ docker-compose down -v
+```
+
+### Build Docker Image
+
+```bash
+# Build image
+$ docker build -t jacinth-backend .
+
+# Run container
+$ docker run -p 3001:3001 --env-file .env jacinth-backend
+```
+
+## Features
+
+- **Authentication**: JWT-based auth with email/SMS OTP verification
+- **Email Service**: SendGrid integration for transactional emails
+- **SMS Service**: Twilio integration for SMS OTP delivery
+- **Payment Processing**: Paystack and Flutterwave integration
+- **Product Management**: Full CRUD operations for products and categories
+- **Shopping Cart**: Complete cart management system
+- **Order Management**: Order creation and tracking
+- **User Management**: Profile management and account operations
+
+## API Endpoints
+
+### Authentication
+- `POST /auth/signup` - User signup
+- `POST /auth/verify-otp` - Verify email OTP
+- `POST /auth/send-phone-otp` - Send SMS OTP
+- `POST /auth/verify-phone-otp` - Verify phone OTP
+- `POST /auth/setup-account` - Complete account setup
+- `POST /auth/login` - User login
+- `POST /auth/reset-password` - Request password reset
+- `POST /auth/reset-password-confirm` - Confirm password reset
+
+### Products
+- `GET /products` - List products (with pagination and filters)
+- `GET /products/slug/:slug` - Get product by slug
+- `GET /products/:id` - Get product by ID
+- `POST /products` - Create product (protected)
+- `PATCH /products/:id` - Update product (protected)
+- `DELETE /products/:id` - Delete product (protected)
+
+### Categories
+- `GET /categories` - List all categories
+- `GET /categories/slug/:slug` - Get category by slug with products
+- `GET /categories/:id` - Get category by ID
+
+### Cart
+- `GET /cart` - Get user's cart (protected)
+- `POST /cart/items` - Add item to cart (protected)
+- `PATCH /cart/items/:id` - Update cart item (protected)
+- `DELETE /cart/items/:id` - Remove item from cart (protected)
+- `DELETE /cart` - Clear cart (protected)
+
+### Orders
+- `POST /orders` - Create order from cart (protected)
+- `GET /orders` - Get user's orders (protected)
+- `GET /orders/:id` - Get order by ID (protected)
+
+### Payments
+- `POST /payments/initialize` - Initialize payment (protected)
+- `POST /payments/verify` - Verify payment (protected)
+- `GET /payments/transactions` - Get transaction history (protected)
+- `POST /payments/webhook/paystack` - Paystack webhook
+- `POST /payments/webhook/flutterwave` - Flutterwave webhook
+
+### Users
+- `GET /users/me` - Get current user profile (protected)
+- `PATCH /users/me` - Update profile (protected)
+- `PATCH /users/me/password` - Change password (protected)
+- `PATCH /users/me/email` - Request email update (protected)
+- `PATCH /users/me/email/verify` - Verify email update (protected)
+- `GET /users/me/stats` - Get user stats (protected)
+- `PATCH /users/me/deactivate` - Deactivate account (protected)
+- `DELETE /users/me` - Delete account (protected)
+
+## Health Check
+
+```bash
+GET /health
+```
+
+Returns application health status and uptime.
 
 ## Deployment
 

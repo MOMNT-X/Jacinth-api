@@ -10,7 +10,10 @@ import { FlutterwaveService } from './providers/flutterwave.service';
 import { PaymentProvider } from './interfaces/payment-provider.interface';
 import { InitializePaymentDto } from './dto/initialize-payment.dto';
 import { VerifyPaymentDto } from './dto/verify-payment.dto';
-import { PaymentProvider as PaymentProviderEnum } from '@prisma/client';
+import {
+  PaymentProvider as PaymentProviderEnum,
+  TransactionStatus,
+} from '@prisma/client';
 import { EmailService } from '../common/services/email.service';
 import { DiscordService } from '../common/services/discord.service';
 
@@ -38,6 +41,21 @@ export class PaymentsService {
       throw new BadRequestException(`Payment provider ${provider} is not supported`);
     }
     return paymentProvider;
+  }
+
+  private mapStatusToTransactionStatus(
+    status: 'success' | 'failed' | 'pending',
+  ): TransactionStatus {
+    switch (status) {
+      case 'success':
+        return TransactionStatus.SUCCESS;
+      case 'failed':
+        return TransactionStatus.FAILED;
+      case 'pending':
+        return TransactionStatus.PENDING;
+      default:
+        return TransactionStatus.PENDING;
+    }
   }
 
   async initializePayment(userId: string, dto: InitializePaymentDto) {
@@ -153,16 +171,17 @@ export class PaymentsService {
     const verification = await provider.verifyPayment(dto.reference);
 
     // Update transaction
+    const transactionStatus = this.mapStatusToTransactionStatus(verification.status);
     const updatedTransaction = await this.prisma.transaction.update({
       where: { id: transaction.id },
       data: {
-        status: verification.status,
+        status: transactionStatus,
         metadata: verification.metadata,
       },
     });
 
     // Update order status if payment successful
-    if (verification.status === 'SUCCESS') {
+    if (verification.status === 'success') {
       await this.prisma.order.update({
         where: { id: transaction.orderId },
         data: {
@@ -230,16 +249,17 @@ export class PaymentsService {
     }
 
     // Update transaction
+    const transactionStatus = this.mapStatusToTransactionStatus(verification.status);
     await this.prisma.transaction.update({
       where: { id: transaction.id },
       data: {
-        status: verification.status,
+        status: transactionStatus,
         metadata: verification.metadata,
       },
     });
 
     // Update order if payment successful
-    if (verification.status === 'SUCCESS' && transaction.order.status === 'PENDING') {
+    if (verification.status === 'success' && transaction.order.status === 'PENDING') {
       await this.prisma.order.update({
         where: { id: transaction.orderId },
         data: {
@@ -265,6 +285,44 @@ export class PaymentsService {
     }
 
     return { message: 'Webhook processed successfully' };
+  }
+
+  async getUserTransactions(userId: string, page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+
+    const [transactions, total] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where: { userId },
+        include: {
+          order: {
+            select: {
+              id: true,
+              status: true,
+              totalAmount: true,
+              createdAt: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip,
+        take: limit,
+      }),
+      this.prisma.transaction.count({
+        where: { userId },
+      }),
+    ]);
+
+    return {
+      data: transactions,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   private async sendOrderConfirmation(order: any) {

@@ -6,6 +6,7 @@ import { SetupAccountDto } from './dto/setup-account.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ResetPasswordConfirmDto } from './dto/reset-password.dto';
+import { SendPhoneOtpDto, VerifyPhoneOtpDto } from './dto/verify-phone-otp.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -45,5 +46,17 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   resetPasswordConfirm(@Body() dto: ResetPasswordConfirmDto) {
     return this.authService.resetPasswordConfirm(dto);
+  }
+
+  @Post('send-phone-otp')
+  @HttpCode(HttpStatus.OK)
+  sendPhoneOtp(@Body() dto: SendPhoneOtpDto) {
+    return this.authService.sendPhoneOtp(dto);
+  }
+
+  @Post('verify-phone-otp')
+  @HttpCode(HttpStatus.OK)
+  verifyPhoneOtp(@Body() dto: VerifyPhoneOtpDto) {
+    return this.authService.verifyPhoneOtp(dto);
   }
 }

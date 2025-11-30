@@ -34,15 +34,6 @@ export class UserController {
     return this.usersService.getUserById(id);
   }
 
-  // Get all users (pagination)
-  @Get()
-  getAllUsers(
-    @Query('page') page: string = '1',
-    @Query('limit') limit: string = '10',
-  ) {
-    return this.usersService.getAllUsers(+page, +limit);
-  }
-
   // Update current user profile
   @Patch('me')
   updateCurrentUser(@Request() req, @Body() dto: UpdateUserDto) {

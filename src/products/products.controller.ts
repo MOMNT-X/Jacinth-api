@@ -27,6 +27,12 @@ export class ProductsController {
     return this.productsService.findAll(filters);
   }
 
+  // GET /products/slug/:slug - Get product by slug
+  @Get('slug/:slug')
+  findBySlug(@Param('slug') slug: string) {
+    return this.productsService.findBySlug(slug);
+  }
+
   // GET /products/:id - Get product by ID
   @Get(':id')
   findOne(@Param('id') id: string) {
