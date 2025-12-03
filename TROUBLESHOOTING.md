@@ -109,6 +109,30 @@ FLUTTERWAVE_SECRET_KEY=your-flutterwave-secret-key
 FLUTTERWAVE_PUBLIC_KEY=your-flutterwave-public-key
 ```
 
+## Architecture Improvements
+
+### Service Layer Refactoring
+
+To prevent connection pool exhaustion, the application has been refactored to use service layers instead of direct Prisma calls:
+
+- **JwtStrategy** now uses `UserService.getUserById()` instead of direct Prisma calls
+- This reduces concurrent database connections and prevents pool exhaustion
+- All services should use existing service layers when available instead of calling Prisma directly
+
+**Best Practices:**
+- Use `UserService` for user-related queries
+- Use `ProductsService` for product-related queries
+- Use `CategoriesService` for category-related queries
+- Only call Prisma directly in service layer classes, not in strategies or controllers
+
+### Connection Pool Best Practices
+
+1. **Always use `connection_limit=1`** in DATABASE_URL for Supabase
+2. **Use service layers** instead of direct Prisma calls where possible
+3. **Batch queries** when possible using Prisma transactions
+4. **Monitor connection pool usage** in production
+5. **Consider Prisma Accelerate** for production if issues persist (paid service)
+
 ## Common Issues
 
 ### App starts but database operations fail
@@ -116,12 +140,26 @@ FLUTTERWAVE_PUBLIC_KEY=your-flutterwave-public-key
 - Check that your `.env` file is in the `jacinth-backend/` directory
 - Restart the application after updating `.env`
 - Verify environment variables are being loaded (check logs)
+- Ensure `connection_limit=1` is set in DATABASE_URL
 
 ### Connection works in one environment but not another
 
 - Different environments may need different connection strings
 - Local development might need direct connection
-- Production should use connection pooling
+- Production should use connection pooling with `connection_limit=1`
+
+### Connection Pool Exhaustion (P2024, P1008 errors)
+
+**Symptoms:**
+- `Timed out fetching a new connection from the connection pool`
+- `Connection pool timeout - too many connections or pool exhausted`
+
+**Solutions:**
+1. Ensure `connection_limit=1` is in your DATABASE_URL
+2. Verify services are using service layers instead of direct Prisma calls
+3. Check for connection leaks (connections not being closed)
+4. Consider using Prisma Accelerate for better connection management
+5. Review concurrent request patterns and implement rate limiting if needed
 
 ## Getting Help
 
@@ -130,4 +168,5 @@ If issues persist:
 2. Verify all environment variables are set correctly
 3. Test database connectivity using `psql` or similar tools
 4. Check Supabase dashboard for connection status
+
 

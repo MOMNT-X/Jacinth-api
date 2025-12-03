@@ -5,11 +5,13 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { PrismaModule } from '../prisma/prisma.module';
+import { UserModule } from '../user/user.module';
 import ms from 'ms';
 
 @Module({
   imports: [
     PrismaModule,
+    UserModule,
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'your-secret-key',

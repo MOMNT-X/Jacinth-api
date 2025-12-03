@@ -29,7 +29,10 @@ export class DiscordService {
   /**
    * Send a message to Discord webhook
    */
-  async sendMessage(content: string, embeds?: DiscordEmbed[]): Promise<boolean> {
+  async sendMessage(
+    content: string,
+    embeds?: DiscordEmbed[],
+  ): Promise<boolean> {
     try {
       const payload: any = {
         content,
@@ -56,7 +59,9 @@ export class DiscordService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        this.logger.error(`Discord webhook failed: ${response.status} - ${errorText}`);
+        this.logger.error(
+          `Discord webhook failed: ${response.status} - ${errorText}`,
+        );
         return false;
       }
 
@@ -71,6 +76,40 @@ export class DiscordService {
   /**
    * Send user signup notification
    */
+  async InitiatedSignup(data: {
+    email: string;
+    fullName: string;
+    userId: string;
+  }): Promise<boolean> {
+    const embed: DiscordEmbed = {
+      title: '🎉 New User has initiated Signup',
+      description:
+        'A new user has  verified email using otp, proceeding to complete signup',
+      color: 0x4ade80, // Green
+      fields: [
+        {
+          name: 'Email',
+          value: data.email,
+          inline: true,
+        },
+        {
+          name: 'Full Name',
+          value: data.fullName,
+          inline: true,
+        },
+        {
+          name: 'User ID',
+          value: data.userId,
+          inline: false,
+        },
+      ],
+      footer: {
+        text: 'Jacinth Pharmacy',
+      },
+    };
+
+    return this.sendMessage('', [embed]);
+  }
   async notifyUserSignup(data: {
     email: string;
     fullName: string;
@@ -78,7 +117,7 @@ export class DiscordService {
   }): Promise<boolean> {
     const embed: DiscordEmbed = {
       title: '🎉 New User Signup',
-      description: 'A new user has registered on the platform',
+      description: 'User has completed signup, we have a newbie on board',
       color: 0x4ade80, // Green
       fields: [
         {
@@ -163,7 +202,11 @@ export class DiscordService {
   /**
    * Send custom notification
    */
-  async notifyCustom(title: string, description: string, fields?: Array<{ name: string; value: string; inline?: boolean }>): Promise<boolean> {
+  async notifyCustom(
+    title: string,
+    description: string,
+    fields?: Array<{ name: string; value: string; inline?: boolean }>,
+  ): Promise<boolean> {
     const embed: DiscordEmbed = {
       title,
       description,
@@ -177,4 +220,3 @@ export class DiscordService {
     return this.sendMessage('', [embed]);
   }
 }
-
